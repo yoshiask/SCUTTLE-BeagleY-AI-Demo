@@ -1,0 +1,97 @@
+from periphery import PWM
+import numpy as np
+import time
+
+# find the pwmchip that has 2 channels:
+#   $ ls /sys/class/pwm
+#   pwmchip0  pwmchip1  ...
+#   $ cat /sys/class/pwm/pwmchipX/npwm   # look for “2”
+
+PWM_CHIP = 1    # replace with the chip number that reports npwm=2
+#RIGHT_WHEEL SUCCESSFUL
+#p0 = PWM(3, 1)   # channel 0 → header pin 32 (GPIO12/PWM0)
+#p1 = PWM(5, 1)   # channel 1 → header pin 33 (GPIO13/PWM1)
+#LEFT_WHEEL TESTING
+p0 = PWM(5, 0)
+p1 = PWM(3, 0)
+p2 = PWM(5, 1)
+p3 = PWM(3, 1)
+
+# configure and enable
+for p in (p0,p1,p2,p3):
+    p.frequency = 150
+    p.enable()
+
+def computePWM(speed: float) -> tuple[float, float]:
+    if speed == 0:
+        return 0, 0
+    else:
+        # Shift range to [0,2]
+        x = speed + 1.0
+        
+        # Channel A sweeps low to high
+        chA = 0.5 * x
+        chA = np.round(chA, 2)
+        
+        # Channel B sweeps high to low
+        chB = 1 - (0.5 * x)
+        chB = np.round(chB, 2)
+        
+        return chA, chB
+
+def driveLeft(speed: float):
+    chA, chB = computePWM(speed)
+    p0.duty_cycle, p1.duty_cycle = chA, chB
+
+def driveRight(speed: float):
+    chA, chB = computePWM(speed)
+    p2.duty_cycle, p3.duty_cycle = chA, chB
+
+def drive(speed):
+    """speed ∈ [-1.0…+1.0]: + forward, - reverse, 0 stop"""
+    driveLeft(speed)
+    driveRight(speed)
+    
+    # if speed > 0:
+    #     p0.duty_cycle, p1.duty_cycle = computePWM(speed)
+    #     p2.duty_cycle = speed
+    #     p3.duty_cycle = 0
+    # elif speed < 0:
+    #     p0.duty_cycle = 0
+    #     p1.duty_cycle = -speed
+    #     p2.duty_cycle = 0
+    #     p3.duty_cycle = -speed
+    # else:
+    #     p0.duty_cycle = 0
+    #     p1.duty_cycle = 0
+    #     p2.duty_cycle = 0
+    #     p3.duty_cycle = 0
+
+# def sendLeft(duty_cycle):
+#     """
+#     duty_cycle should be in [0.0 … 1.0].
+#     If you want signed [-1…+1], map it here before passing to PWM.
+#     """
+#     left_pwm.duty_cycle = max(0.0, min(1.0, duty_cycle))
+
+# def sendRight(duty_cycle):
+    # right_pwm.duty_cycle = max(0.0, min(1.0, duty_cycle))
+
+if __name__ == "__main__":
+    try:
+        #drive(0.8);  time.sleep(4)   # forward
+        #drive(-0.8); time.sleep(4)   # reverse
+        driveLeft(0.8); time.sleep(4)# turn left
+        drive(0); 
+        driveRight(0.8); time.sleep(4)# turn right
+        drive(0);    time.sleep(4)   # stop
+    finally:
+        p0.disable()
+        p1.disable()
+        p0.close()
+        p1.close()
+
+        p2.disable()
+        p3.disable()
+        p2.close()
+        p3.close()
