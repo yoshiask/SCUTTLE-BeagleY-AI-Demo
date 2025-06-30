@@ -7,7 +7,9 @@ from inputs import devices, get_gamepad
 
 # raw axis min/max (your sticks) and trigger threshold
 RAW_MIN = 0
-RAW_MAX = 32500
+RAW_MAX = 32758
+RAW_CEN = (RAW_MAX + RAW_MIN) / 2
+DEADZONE = 125
 TRIGGER_THRESHOLD = 10   # >10 counts as “pressed”
 
 class Gamepad:
@@ -116,6 +118,11 @@ def getGP():
         -gamepad.axes['RIGHT_X'],
         gamepad.axes['RIGHT_Y']
     ], dtype=float)
+
+    for a in range(len(raw)):
+        if abs(raw[a] - RAW_CEN) < DEADZONE:
+            raw[a] = RAW_CEN
+
     axes = (raw - RAW_MIN)/(RAW_MAX-RAW_MIN)*2.0 - 1.0
     axes *= -1
     axes = np.clip(axes, -1.0, 1.0)

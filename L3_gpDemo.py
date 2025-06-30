@@ -36,7 +36,7 @@ while True:
     # COLLECT GAMEPAD COMMANDS
     gp_data = gp.getGP()
     axis0 = gp_data[0] * -1
-    axis1 = gp_data[1] * -1
+    axis1 = gp_data[1]
     rthumb = gp_data[3] # up/down axis of right thumb
     horn = gp_data[4]   # "y" button
     
@@ -62,7 +62,6 @@ while True:
     chassisTargets = inv.map_speeds(np.array([axis1, axis0])) # generate xd, td
     pdTargets = inv.convert(chassisTargets) # pd means phi dot (rad/s)
     # phiString = str(pdTargets[0]) + "," + str(pdTargets[1])
-    # print("pdTargets (rad/s): \t" + phiString)
     # log.stringTmpFile(phiString,"pdTargets.txt")
     
     #DRIVING
