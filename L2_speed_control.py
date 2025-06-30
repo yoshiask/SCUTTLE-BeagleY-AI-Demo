@@ -25,19 +25,17 @@ def openLoop(pdl, pdr):
     return duties
 
 def driveOpenLoop(pdTargets):                       # Pass Phi dot targets to this function
-    duties = [ (t + 1.0)/2.0 for t in pdTargets ]   # produce duty cycles from the phi dots
-    m.driveLeft(duties[0])                           # send command to motors
-    m.driveRight(duties[1])                          # send command to motors
+    duties = openLoop(pdTargets[0], pdTargets[1])   # produce duty cycles from the phi dots
+    duties = [scalingFunction(d) for d in duties]
+    print(duties)
+    m.driveLeft(duties[0])         # send command to motors
+    m.driveRight(duties[1])        # send command to motors
 
 
 def scalingFunction(x):                             # a fcn to compress the PWM region where motors don't turn
-    if -0.222 < x and x < 0.222:
-        y = (x * 3)
-    elif x > 0.222:
-        y = ((x * 0.778) + 0.222)
-    else:
-        y = ((x * 0.778) - 0.222)
-    return y
+    if abs(x) < 0.2:
+        return 0.0
+    return x
 
 def scaleMotorEffort(u):                            # send the control effort signals to the scaling function
     u_out = np.zeros(2)
