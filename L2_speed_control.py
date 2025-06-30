@@ -26,8 +26,8 @@ def openLoop(pdl, pdr):
 
 def driveOpenLoop(pdTargets):                       # Pass Phi dot targets to this function
     duties = [ (t + 1.0)/2.0 for t in pdTargets ]   # produce duty cycles from the phi dots
-    m.sendLeft(duties[0])                           # send command to motors
-    m.sendRight(duties[1])                          # send command to motors
+    m.driveLeft(duties[0])                           # send command to motors
+    m.driveRight(duties[1])                          # send command to motors
 
 
 def scalingFunction(x):                             # a fcn to compress the PWM region where motors don't turn
