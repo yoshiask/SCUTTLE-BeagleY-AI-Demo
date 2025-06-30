@@ -37,6 +37,8 @@ def computePWM(speed: float) -> tuple[float, float]:
         chB = 1 - (0.5 * x)
         chB = np.round(chB, 2)
         
+        chA, chB = np.clip([chA, chB], 0, 1)
+
         return chA, chB
 
 def driveLeft(speed: float):
@@ -51,31 +53,6 @@ def drive(speed):
     """speed ∈ [-1.0…+1.0]: + forward, - reverse, 0 stop"""
     driveLeft(speed)
     driveRight(speed)
-    
-    # if speed > 0:
-    #     p0.duty_cycle, p1.duty_cycle = computePWM(speed)
-    #     p2.duty_cycle = speed
-    #     p3.duty_cycle = 0
-    # elif speed < 0:
-    #     p0.duty_cycle = 0
-    #     p1.duty_cycle = -speed
-    #     p2.duty_cycle = 0
-    #     p3.duty_cycle = -speed
-    # else:
-    #     p0.duty_cycle = 0
-    #     p1.duty_cycle = 0
-    #     p2.duty_cycle = 0
-    #     p3.duty_cycle = 0
-
-# def sendLeft(duty_cycle):
-#     """
-#     duty_cycle should be in [0.0 … 1.0].
-#     If you want signed [-1…+1], map it here before passing to PWM.
-#     """
-#     left_pwm.duty_cycle = max(0.0, min(1.0, duty_cycle))
-
-# def sendRight(duty_cycle):
-    # right_pwm.duty_cycle = max(0.0, min(1.0, duty_cycle))
 
 if __name__ == "__main__":
     try:
