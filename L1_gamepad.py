@@ -7,7 +7,7 @@ from inputs import devices, get_gamepad
 
 # raw axis min/max (your sticks) and trigger threshold
 RAW_MIN = 0
-RAW_MAX = 255
+RAW_MAX = 32500
 TRIGGER_THRESHOLD = 10   # >10 counts as “pressed”
 
 class Gamepad:
@@ -111,12 +111,13 @@ def getGP():
 
     # scale sticks ⇒ [-1, +1]
     raw = np.array([
-        gamepad.axes['LEFT_X'],
+        -gamepad.axes['LEFT_X'],
         gamepad.axes['LEFT_Y'],
-        gamepad.axes['RIGHT_X'],
+        -gamepad.axes['RIGHT_X'],
         gamepad.axes['RIGHT_Y']
     ], dtype=float)
     axes = (raw - RAW_MIN)/(RAW_MAX-RAW_MIN)*2.0 - 1.0
+    axes *= -1
     axes = np.clip(axes, -1.0, 1.0)
 
     # pack buttons (now including LT/RT from triggers)
