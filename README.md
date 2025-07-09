@@ -1,4 +1,4 @@
-![Logo](image/jpg_1980px.jpg ':class=image-25')
+![Logo](image/SCUTTLE_Banner.jpg ':class=image-25')
 
 # Welcome to the SCUTTLE Software Gude!
 
