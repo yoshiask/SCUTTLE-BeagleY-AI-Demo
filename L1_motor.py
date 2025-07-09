@@ -1,21 +1,11 @@
-from periphery import PWM
+from L1_pwm import pwm_from_gpio_pin
 import numpy as np
 import time
 
-# find the pwmchip that has 2 channels:
-#   $ ls /sys/class/pwm
-#   pwmchip0  pwmchip1  ...
-#   $ cat /sys/class/pwm/pwmchipX/npwm   # look for “2”
-
-PWM_CHIP = 1    # replace with the chip number that reports npwm=2
-#RIGHT_WHEEL SUCCESSFUL
-#p0 = PWM(3, 1)   # channel 0 → header pin 32 (GPIO12/PWM0)
-#p1 = PWM(5, 1)   # channel 1 → header pin 33 (GPIO13/PWM1)
-#LEFT_WHEEL TESTING
-p0 = PWM(5, 0)
-p1 = PWM(3, 0)
-p2 = PWM(5, 1)
-p3 = PWM(3, 1)
+p0 = pwm_from_gpio_pin(6)
+p1 = pwm_from_gpio_pin(5)
+p2 = pwm_from_gpio_pin(13)
+p3 = pwm_from_gpio_pin(12)
 
 # configure and enable
 for p in (p0,p1,p2,p3):
@@ -56,12 +46,26 @@ def drive(speed):
 
 if __name__ == "__main__":
     try:
-        #drive(0.8);  time.sleep(4)   # forward
-        #drive(-0.8); time.sleep(4)   # reverse
-        driveLeft(0.8); time.sleep(4)# turn left
-        drive(0); 
-        driveRight(0.8); time.sleep(4)# turn right
-        drive(0);    time.sleep(4)   # stop
+        print("Forward")
+        drive(0.8)
+        time.sleep(4)
+
+        print("Reverse")
+        drive(-0.8)
+        time.sleep(4)
+        
+        print("Left")
+        driveLeft(0.8)
+        driveRight(-0.8)
+        time.sleep(4)
+
+        print("Right")
+        driveLeft(-0.8)
+        driveRight(0.8)
+        time.sleep(4)
+        
+        print("Stopping")
+        drive(0)
     finally:
         p0.disable()
         p1.disable()
