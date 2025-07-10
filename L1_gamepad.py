@@ -106,38 +106,37 @@ class Gamepad:
     def getStates(self):
         return self.states
 
+    def readValues(self):
+        if not self.stateUpdating:
+            return None
 
-def getGP():
-    if not gamepad.stateUpdating:
-        return None
+        # scale sticks ⇒ [-1, +1]
+        raw = np.array([
+            -self.axes['LEFT_X'],
+            self.axes['LEFT_Y'],
+            -self.axes['RIGHT_X'],
+            self.axes['RIGHT_Y']
+        ], dtype=float)
 
-    # scale sticks ⇒ [-1, +1]
-    raw = np.array([
-        -gamepad.axes['LEFT_X'],
-        gamepad.axes['LEFT_Y'],
-        -gamepad.axes['RIGHT_X'],
-        gamepad.axes['RIGHT_Y']
-    ], dtype=float)
+        for a in range(len(raw)):
+            if abs(raw[a] - RAW_CEN) < DEADZONE:
+                raw[a] = RAW_CEN
 
-    for a in range(len(raw)):
-        if abs(raw[a] - RAW_CEN) < DEADZONE:
-            raw[a] = RAW_CEN
+        axes = (raw - RAW_MIN)/(RAW_MAX-RAW_MIN)*2.0 - 1.0
+        axes *= -1
+        axes = np.clip(axes, -1.0, 1.0)
 
-    axes = (raw - RAW_MIN)/(RAW_MAX-RAW_MIN)*2.0 - 1.0
-    axes *= -1
-    axes = np.clip(axes, -1.0, 1.0)
+        # pack buttons (now including LT/RT from triggers)
+        buttons = np.array([
+            self.buttons['Y'],   self.buttons['B'],
+            self.buttons['A'],   self.buttons['X'],
+            self.buttons['LB'],  self.buttons['RB'],
+            self.buttons['LT'],  self.buttons['RT'],
+            self.buttons['BACK'],self.buttons['START'],
+            self.buttons['L_JOY'],self.buttons['R_JOY'],
+        ], dtype=int)
 
-    # pack buttons (now including LT/RT from triggers)
-    buttons = np.array([
-        gamepad.buttons['Y'],   gamepad.buttons['B'],
-        gamepad.buttons['A'],   gamepad.buttons['X'],
-        gamepad.buttons['LB'],  gamepad.buttons['RB'],
-        gamepad.buttons['LT'],  gamepad.buttons['RT'],
-        gamepad.buttons['BACK'],gamepad.buttons['START'],
-        gamepad.buttons['L_JOY'],gamepad.buttons['R_JOY'],
-    ], dtype=int)
-
-    return np.hstack((axes, buttons))
+        return np.hstack((axes, buttons))
 
 
 # instantiate on import so getGP() will always see it
@@ -145,7 +144,7 @@ gamepad = Gamepad()
 
 if __name__ == "__main__":
     while True:
-        data = getGP()
+        data = gamepad.readValues()
         if data is None:
             break
         print(data)
