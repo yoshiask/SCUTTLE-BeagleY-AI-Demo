@@ -2,9 +2,7 @@
 import time
 import threading
 import numpy as np
-import inputs
-from inputs import devices, get_gamepad
-
+from evdev import list_devices, InputDevice, ecodes
 
 class Gamepad:
     # raw axis min/max (your sticks) and trigger threshold
@@ -12,37 +10,48 @@ class Gamepad:
     TRIGGER_THRESHOLD = 10   # >10 counts as “pressed”
     
     def __init__(self):
-        gamepads = [d.name for d in devices if isinstance(d, inputs.GamePad)]
-        if not gamepads:
-            print("\nNo gamepad detected.\n")
-            return
-        print("Found gamepad(s):", gamepads)
+        # Get first gamepad (any device that reports analog sticks)
+        devices = [InputDevice(d) for d in list_devices()]
+        gamepads = [d for d in devices if ecodes.EV_ABS in d.capabilities()]
+
+        self._dev = gamepads[0]
+        print("Found gamepad:", self._dev.name)
 
         # map only the four main axes
         self.axesMap = {
-            'ABS_X':  'LEFT_X',
-            'ABS_Y':  'LEFT_Y',
-            'ABS_RX': 'RIGHT_X',
-            'ABS_RY': 'RIGHT_Y',
+            ecodes.ABS_X:  'LEFT_X',
+            ecodes.ABS_Y:  'LEFT_Y',
+            ecodes.ABS_RX: 'RIGHT_X',
+            ecodes.ABS_RY: 'RIGHT_Y',
         }
 
         # digital buttons
         self.buttonMap = {
-            'BTN_SOUTH':'Y',
-            'BTN_EAST':  'B',
-            'BTN_C':     'A',
-            'BTN_NORTH': 'X',
-            'BTN_WEST':  'LB',
-            'BTN_Z':     'RB',
-            'BTN_TL2':   'BACK',
-            'BTN_TR2':   'START',
-            'BTN_SELECT':'L_JOY',
-            'BTN_START': 'R_JOY',
-            'BTN_MODE':  'MODE',
+            ecodes.BTN_SOUTH: 'Y',
+            ecodes.BTN_EAST:  'B',
+            ecodes.BTN_C:     'A',
+            ecodes.BTN_NORTH: 'X',
+            ecodes.BTN_WEST:  'LB',
+            ecodes.BTN_Z:     'RB',
+            ecodes.BTN_TL2:   'BACK',
+            ecodes.BTN_TR2:   'START',
+            ecodes.BTN_SELECT:'L_JOY',
+            ecodes.BTN_START: 'R_JOY',
+            ecodes.BTN_MODE:  'MODE',
             # note: BTN_TL and BTN_TR are the bumpers, not triggers
-            'BTN_TL':    'LT',   # if your pad reports a digital LT/RT
-            'BTN_TR':    'RT',
+            ecodes.BTN_TL:    'LT',   # if your pad reports a digital LT/RT
+            ecodes.BTN_TR:    'RT',
         }
+
+        # Ask gamepad for its raw minimum and maximum values for the X and Y axes
+        caps = self._dev.capabilities(verbose=True, absinfo=True)
+        print("Gamepad capabilities:", caps)
+
+        self.axis_ranges = {}
+        for abs_code, logical in self.axesMap.items():
+            info = self._dev.absinfo(abs_code)
+            self.axis_ranges[logical] = (info.min, info.max, info.flat)
+            print(f"{logical}: raw_min={info.min}, raw_max={info.max}, deadzone={info.flat}, threshold={info.fuzz}")
 
         # initialize everything
         self.axes = {name: None for name in self.axesMap.values()}
@@ -54,37 +63,38 @@ class Gamepad:
         self.thread = threading.Thread(target=self._updater, daemon=True)
         self.thread.start()
 
-        self.calibrate(gamepads[0])
-
     def _poll(self):
-        for event in get_gamepad():
-            code, val = event.code, event.state
+        for event in self._dev.read_loop():
+            code, val = event.code, event.value
+            name = ecodes.keys[code]
 
-            if event.ev_type == "Absolute":
+            if event.type == ecodes.EV_ABS:
                 # D-pad
-                if code.startswith("ABS_HAT"):
-                    if code.endswith("X"):
+                if code in (ecodes.ABS_HAT0X, ecodes.ABS_HAT0Y, ecodes.ABS_HAT1X, ecodes.ABS_HAT1Y, ecodes.ABS_HAT2X, ecodes.ABS_HAT2Y, ecodes.ABS_HAT3X, ecodes.ABS_HAT3Y):
+                    if code % 2 == 0:  # X axis
                         self.hat[0] = val
-                    else:
+                    else:              # Y axis
                         self.hat[1] = val
 
                 # main analog sticks
                 elif code in self.axesMap:
-                    self.axes[self.axesMap[code]] = val
+                    mapped_name = self.axesMap[code]
+                    self.axes[mapped_name] = val
 
                 # treat analog triggers as digital buttons
-                elif code == 'ABS_Z':    # left trigger
+                elif code == ecodes.ABS_Z:    # left trigger
                     self.buttons['LT'] = 1 if val > self.TRIGGER_THRESHOLD else 0
-                elif code == 'ABS_RZ':   # right trigger
+                elif code == ecodes.ABS_RZ:   # right trigger
                     self.buttons['RT'] = 1 if val > self.TRIGGER_THRESHOLD else 0
 
                 # anything else: ignore
                 else:
                     continue
 
-            elif event.ev_type == "Key":
+            elif event.type == ecodes.EV_KEY:
                 if code in self.buttonMap:
-                    self.buttons[self.buttonMap[code]] = val
+                    mapped_name = self.buttonMap[code]
+                    self.buttons[mapped_name] = val
                 else:
                     # unknown key event
                     continue
@@ -100,70 +110,7 @@ class Gamepad:
         except Exception as e:
             print("Gamepad thread stopped:", e)
             self.stateUpdating = False
-
-    def calibrate(self, controller_name: str):
-        # Check for previous calibration data
-        with open("joystick_calibration.tsv", "r") as f:
-            while True:
-                line = f.readline()
-                if not line:
-                    break
-                data = line.strip().split('\t')
-                name = data[0]
-                if name == controller_name:
-                    # Pull existing data
-                    self.RAW_X_MIN = int(data[1])
-                    self.RAW_X_MAX = int(data[2])
-                    self.RAW_Y_MIN = int(data[3])
-                    self.RAW_Y_MAX = int(data[4])
-                    return
-
-        print("Calibrating gamepad...")
-
-        # Wait for updater to start
-        while not self.stateUpdating:
-            pass
-
-        # Read extreme values for each axis
-        self.RAW_X_MIN = self._readExtremeValue("left", ['LEFT_X', 'RIGHT_X'])
-        self.RAW_X_MAX = self._readExtremeValue("right", ['LEFT_X', 'RIGHT_X'])
-        self.RAW_Y_MIN = self._readExtremeValue("down", ['LEFT_Y', 'RIGHT_Y'])
-        self.RAW_Y_MAX = self._readExtremeValue("up", ['LEFT_Y', 'RIGHT_Y'])
-
-        # Update center value
-        self.RAW_X_CEN = (self.RAW_X_MAX + self.RAW_X_MIN) / 2
-        self.RAW_Y_CEN = (self.RAW_Y_MAX + self.RAW_Y_MIN) / 2
-
-        # Save calibration data
-        calibration_data = [controller_name,
-                            str(self.RAW_X_MIN), str(self.RAW_X_MAX),
-                            str(self.RAW_Y_MIN), str(self.RAW_Y_MAX)]
-        line = "\t".join(calibration_data)
-        with open("joystick_calibration.tsv", "a") as f:
-            f.write(line)
-            f.write("\n")
-        print("Calibration complete:", line)
-        
-    def _readExtremeValue(self, direction_name: str, axis_codes: list[str], duration: float = 2.0):
-        print(f"\n• Move stick *all the way* {direction_name} and press Enter →", end=' ', flush=True)
-        input()
-        print(f"  Recording for {duration:.1f}...")
- 
-        startTime = time.time()
-        extremeVal = 0
-
-        while (time.time() - startTime < duration):
-            axes = self.getStates()["axes"]
-            for code in axis_codes:
-                if code not in axes:
-                    continue
-                val = axes[code]
-                print(val)
-                if abs(val) > abs(extremeVal):
-                    extremeVal = val
-
-        return extremeVal
-
+   
     def getStates(self):
         return self.states
 
@@ -178,10 +125,11 @@ class Gamepad:
         raw_right_y = self.axes['RIGHT_Y']
         
         # scale sticks ⇒ [-1, +1]
-        left_x = self._scaleAxisValue(raw_left_x, self.RAW_X_MIN, self.RAW_X_MAX, self.DEADZONE)
-        left_y = self._scaleAxisValue(raw_left_y, self.RAW_Y_MIN, self.RAW_Y_MAX, self.DEADZONE)
-        right_x = self._scaleAxisValue(raw_right_x, self.RAW_X_MIN, self.RAW_X_MAX, self.DEADZONE)
-        right_y = self._scaleAxisValue(raw_right_y, self.RAW_Y_MIN, self.RAW_Y_MAX, self.DEADZONE)
+        # TODO: Verify direction of each axis. Right now, the +Y axis points down
+        left_x = self._scaleAxisValue(raw_left_x, *self.axis_ranges['LEFT_X'])
+        left_y = self._scaleAxisValue(raw_left_y, *self.axis_ranges['LEFT_Y'])
+        right_x = self._scaleAxisValue(raw_right_x, *self.axis_ranges['RIGHT_X'])
+        right_y = self._scaleAxisValue(raw_right_y, *self.axis_ranges['RIGHT_Y'])
 
         axes = [left_x, left_y, right_x, right_y]
 
@@ -202,7 +150,17 @@ class Gamepad:
         if raw_value is None:
             return 0.0
 
-        return raw_value / (raw_max - raw_min)
+        # Shift raw value to be centered around zero
+        raw_cen = (raw_min + raw_max) / 2
+        centered_value = raw_value - raw_cen
+        
+        if abs(centered_value) < deadzone:
+            # Within deadzone, treat as zero
+            return 0.0
+
+        # Normalize by half of the total range
+        raw_span = (raw_max - raw_min) / 2
+        return centered_value / raw_span
 
 if __name__ == "__main__":
     gamepad = Gamepad()
