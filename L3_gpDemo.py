@@ -17,7 +17,7 @@ import L2_inverse_kinematics as inv
 import L2_kinematics as kin
 import L2_speed_control as sc
 
-gp.gamepad = gp.Gamepad()
+gamepad = gp.Gamepad()
 
 # Run the main loop
 while True:
@@ -34,7 +34,10 @@ while True:
     # log.tmpFile(vb,"vb.txt")
     
     # COLLECT GAMEPAD COMMANDS
-    gp_data = gp.getGP()
+    gp_data = gamepad.readValues()
+    if gp_data is None:
+        continue
+    
     axis0 = gp_data[0] * -1
     axis1 = gp_data[1]
     rthumb = gp_data[3] # up/down axis of right thumb
