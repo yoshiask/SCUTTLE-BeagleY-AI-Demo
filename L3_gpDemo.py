@@ -39,7 +39,7 @@ while True:
         continue
     
     axis0 = gp_data[0] * -1
-    axis1 = gp_data[1]
+    axis1 = gp_data[1] * -1
     rthumb = gp_data[3] # up/down axis of right thumb
     horn = gp_data[4]   # "y" button
     
