@@ -9,7 +9,7 @@ p3 = pwm_from_gpio_pin(12)
 
 # configure and enable
 for p in (p0,p1,p2,p3):
-    p.frequency = 150
+    p.frequency = 20000
     p.enable()
 
 def computePWM(speed: float) -> tuple[float, float]:
